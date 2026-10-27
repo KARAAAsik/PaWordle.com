@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Wordle Game</title>
+    <style>
+        body { background-color: #121213; color: white; font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 0; min-height: 100vh; transition: all 0.3s ease-in-out; }
+        body.gaming-theme { background-color: #0b0114 !important; color: #00ffcc !important; font-family: 'Courier New', Courier, monospace; }
+        header { font-size: 32px; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; }
+        .btn { background-color: #818384; color: white; border: none; padding: 10px 20px; font-weight: bold; border-radius: 4px; cursor: pointer; text-transform: uppercase; font-size: 14px; transition: all 0.3s ease-in-out; }
+        .btn:hover { background-color: #565758; }
+        .btn.active { background-color: #538d4e; }
+        body.gaming-theme .btn { background-color: #1a0033; color: #ff007f; border: 1px solid #ff007f; box-shadow: 0 0 10px #ff007f; }
+        body.gaming-theme .btn.active { background-color: #ff007f; color: white; }
+        #board { display: grid; gap: 5px; margin-bottom: 20px; }
+        .row { display: grid; gap: 5px; }
+        .tile { width: 50px; height: 50px; border: 2px solid #3a3a3c; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; text-transform: uppercase; box-sizing: border-box; transition: all 0.3s ease-in-out; }
+        body.gaming-theme .tile { border: 2px solid #00ffcc !important; box-shadow: 0 0 5px #00ffcc; }
+        .tile.correct { background-color: #538d4e !important; border-color: #538d4e !important; color: white; }
+        .tile.present { background-color: #b59f3b !important; border-color: #b59f3b !important; color: white; }
+        .tile.absent { background-color: #3a3a3c !important; border-color: #3a3a3c !important; color: white; }
+        #keyboard { display: flex; flex-direction: column; gap: 6px; align-items: center; max-width: 500px; width: 100%; padding: 0 10px; box-sizing: border-box; }
+        .key-row { display: flex; gap: 4px; width: 100%; justify-content: center; }
+        .key { background-color: #818384; color: white; border: none; border-radius: 4px; height: 50px; flex: 1; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 14px; transition: all 0.3s ease-in-out; }
+        .key:hover { background-color: #565758; }
+        body.gaming-theme .key { background-color: #1f1135 !important; color: #00ffcc !important; }
+        .key.wide { flex: 1.5; }
+        .message { height: 24px; font-weight: bold; color: #ff3333; margin-bottom: 10px; font-size: 16px; text-align: center; }
+    </style>
+</head>
+<body>
+    <header id="game-title">Wordle</header>
+    <div class="controls">
+        <button id="mode-4" class="btn" onclick="changeLength(4);">4 Буквы</button>
+        <button id="mode-5" class="btn active" onclick="changeLength(5);">5 Букв</button>
+        <button id="hint-btn" class="btn" onclick="showHint();">Подсказка</button>
+        <button id="theme-btn" class="btn" onclick="toggleTheme();">🎮 Тема: Игры</button>
+    </div>
+    <div class="message" id="message"></div>
+    <div id="board"></div>
+    <div id="keyboard"></div>
+
+    <script>
+        const dict4 = ["ИГРА", "БОСС", "ДИСК", "КЛУБ", "СЕТЬ", "КОДЫ", "ДВЕРЬ", "КЛАД", "МОСТ", "ЗВУК", "КИНО", "ДРУГ", "РУКА", "ОКНО", "ВОДА", "ОДИН", "МИНА", "ПЛАН", "УРОК", "ЗНАК"];
+        const dict5 = ["ПИЛОТ", "КНИГА", "РУЧКА", "СЛОВО", "ОКЕАН", "ФАКЕЛ", "ЭКРАН", "МЫШКА", "ТЕКСТ", "ЗЕМЛЯ", "ВРЕМЯ", "ЖИЗНЬ", "ГОРОД", "ПОЕЗД", "ПЛЕМЯ", "ПТИЦА", "СПОРТ", "ТЕАТР", "ТРАВА", "ФРУКТ"];
+        const game4 = ["ИГРА", "БОСС", "ДИСК", "КЛУБ", "СЕТЬ", "КОДЫ", "КЛАН", "ПОРТ"];
+        const game5 = ["ГЕЙМР", "КВЕСТ", "ПРИЗ", "АТАКА", "ПИКСЛ", "ЗАМЕК", "КАРТА", "ТИМЕЙ", "СТРИМ", "КУБИК", "РАУНД", "АРКАД", "МОДЕР", "ЛАГЕР"];
+        
+        const keyMap = { 'KeyQ':'Й', 'KeyW':'Ц', 'KeyE':'У', 'KeyR':'К', 'KeyT':'Е', 'KeyY':'Н', 'KeyU':'Г', 'KeyI':'Ш', 'KeyO':'Щ', 'KeyP':'З', 'BracketLeft':'Х', 'BracketRight':'Ъ', 'KeyA':'Ф', 'KeyS':'Ы', 'KeyD':'В', 'KeyF':'А', 'KeyG':'П', 'KeyH':'Р', 'KeyJ':'О', 'KeyK':'Л', 'KeyL':'Д', 'Semicolon':'Ж', 'Quote':'Э', 'KeyZ':'Я', 'KeyX':'Ч', 'KeyC':'С', 'KeyV':'М', 'KeyB':'И', 'KeyN':'Т', 'KeyM':'Ь', 'Comma':'Б', 'Period':'Ю' };
+
+        let wordLength = 5, isGaming = false, secretWord = "", guesses = [], currentGuess = "", gameOver = false;
+        const maxGuesses = 6;
+
+        function initGame() {
+            guesses = []; currentGuess = ""; gameOver = false; setMessage("");
+            let list = isGaming ? (wordLength === 4 ? game4 : game5) : (wordLength === 4 ? dict4 : dict5);
+            secretWord = list[Math.floor(Math.random() * list.length)].trim().toUpperCase();
+            drawBoard(); drawKeyboard();
+        }
+
+        function drawBoard() {
+            const board = document.getElementById("board"); board.innerHTML = "";
+            board.style.gridTemplateRows = `repeat(${maxGuesses}, 1fr)`;
+            for (let i = 0; i < maxGuesses; i++) {
+                const row = document.createElement("div"); row.className = "row";
+                row.style.gridTemplateColumns = `repeat(${wordLength}, 1fr)`;
+                for (let j = 0; j < wordLength; j++) {
+                    const tile = document.createElement("div"); tile.className = "tile"; tile.id = `t-${i}-${j}`;
+                    if (guesses[i]) {
+                        tile.innerText = guesses[i][j];
+                        let status = checkTileStatus(guesses[i], j);
+                        tile.classList.add(status);
+                    } else if (i === guesses.length && currentGuess[j]) { tile.innerText = currentGuess[j]; }
+                    row.appendChild(tile);
+                }
+                board.appendChild(row);
+            }
+        }
+
+        function checkTileStatus(guess, index) {
+            if (guess[index] === secretWord[index]) { return "correct"; }
+            if (secretWord.includes(guess[index])) { return "present"; }
+            return "absent";
+        }
+
+        function drawKeyboard() {
+            const kb = document.getElementById("keyboard"); kb.innerHTML = "";
+            const rows = [["Й","Ц","У","К","Е","Н","Г","Ш","Щ","З","Х","Ъ"], ["Ф","Ы","В","А","П","Р","О","Л","Д","Ж","Э"], ["ENTER","Я","Ч","С","М","И","Т","Ь","Б","Ю","⌫"]];
+            rows.forEach(r => {
+                const row = document.createElement("div"); row.className = "key-row";
+                r.forEach(k => {
+                    const btn = document.createElement("button"); btn.className = "key"; btn.innerText = k;
+                    if (k === "ENTER" || k === "⌫") { btn.classList.add("wide"); }
+                    btn.onclick = () => { handleInput(k); };
+                    row.appendChild(btn);
+                });
+                kb.appendChild(row);
+            });
+        }
+
+        function handleInput(key) {
+            if (gameOver) { return; }
+            if (key === "BACKSPACE" || key === "⌫") { currentGuess = currentGuess.slice(0, -1); }
+            else if (key === "ENTER") { submitGuess(); }
+            else if (key.length === 1 && currentGuess.length < wordLength) { currentGuess += key.toUpperCase(); }
+            drawBoard();
+        }
+
+        function submitGuess() {
+            if (currentGuess.length !== wordLength) { setMessage("Недостаточно букв"); return; }
+            let validList = isGaming ? (wordLength === 4 ? game4 : game5) : (wordLength === 4 ? dict4 : dict5);
+            let cleanedList = validList.map(w => w.trim().toUpperCase());
+            if (!cleanedList.includes(currentGuess)) { setMessage("Нет такого слова в словаре!"); return; }
+            setMessage(""); guesses.push(currentGuess);
+            if (currentGuess === secretWord) { setMessage("Вы победили! Нажмите ESC для новой игры."); gameOver = true; }
+            else if (guesses.length >= maxGuesses) { setMessage(`Игра окончена! Слово: ${secretWord}. Нажмите ESC.`); gameOver = true; }
+            currentGuess = "";
+        }
+
+        function setMessage(msg) { document.getElementById("message").innerText = msg; }
+        
+        function changeLength(len) {
+            wordLength = len;
+            document.getElementById("mode-4").classList.toggle("active", len === 4);
+            document.getElementById("mode-5").classList.toggle("active", len === 5);
+            initGame();
+        }
+
+        function toggleTheme() {
+            isGaming = !isGaming; const body = document.body; const btn = document.getElementById("theme-btn");
+            if (isGaming) { body.classList.add("gaming-theme"); btn.innerText = "🎮 Тема: ИГРЫ ВКЛ"; }
+            else { body.classList.remove("gaming-theme"); btn.innerText = "🎮 Тема: Игры"; }
+            initGame();
+        }
+
+        function showHint() {
+            if (gameOver) { return; }
+            let unused = [];
+            for (let c of secretWord) { if (!guesses.some(g => g.includes(c))) { unused.push(c); } }
+            let letter = unused.length > 0 ? unused[Math.floor(Math.random() * unused.length)] : secretWord[Math.floor(Math.random() * secretWord.length)];
+            setMessage(`Подсказка: В слове есть буква "${letter}"`);
+        }
+
+        window.addEventListener("keydown", e => {
+            if (e.key === "Escape") { initGame(); }
+            else if (e.key === "Backspace") { handleInput("⌫"); }
+            else if (e.key === "Enter") { handleInput("ENTER"); }
+            else if (keyMap[e.code]) { handleInput(keyMap[e.code]); }
+        });
+
+        initGame();
+    </script>
+</body>
+</html>
